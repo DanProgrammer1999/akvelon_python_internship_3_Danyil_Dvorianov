@@ -3,63 +3,59 @@ import json
 from django.core import serializers
 from django.db import IntegrityError
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
-from django.shortcuts import redirect, get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
-from transapp.models.agent import Agent
+from transapp.models.transaction import Transaction
 
 
 # TODO remove decorator
 @method_decorator(csrf_exempt, name='dispatch')
 class AgentView(View):
-    model = Agent
+    model = Transaction
 
-    def get(self, request, agent_id=''):
-        email_filter = request.GET.get('email', '')
-        sort_by_field = request.GET.get('sort_by', 'last_name')
-        if agent_id == '':
+    def get(self, request, transaction_id=''):
+        if transaction_id == '':
             try:
-                all_agents = sorted(self.model.objects.filter(email__contains=email_filter),
-                                    key=lambda a: getattr(a, sort_by_field))
+                all_items = self.model.objects.all()
             except AttributeError:
                 return HttpResponseBadRequest()
 
-            return HttpResponse(serializers.serialize("json", all_agents), content_type="application/json")
+            return HttpResponse(serializers.serialize("json", all_items), content_type="application/json")
         else:
             try:
-                agent = get_object_or_404(self.model, id=agent_id)
-                return HttpResponse(serializers.serialize("json", [agent]), content_type="application/json")
+                agent = serializers.serialize("json", [self.model.objects.get(pk=transaction_id)])
+                return HttpResponse(agent, content_type="application/json")
             except self.model.DoesNotExist:
                 return Http404()
 
     def post(self, request):
         data = json.loads(request.body.decode('utf-8'))
         try:
-            agent = self.model(first_name=data['first_name'], last_name=data['last_name'], email=data['email'])
-            agent.save()
-            response = JsonResponse({'id': agent.id})
+            item = self.model(agent_id=data['agent_id'], amount=data['amount'], date=data['date'])
+            item.save()
+            response = JsonResponse({'id': item.id})
             response.status_code = 201
             return response
         except (KeyError, IntegrityError):
             return HttpResponseBadRequest()
 
-    def put(self, request, agent_id):
+    def put(self, request, transaction_id):
         data = json.loads(request.body.decode('utf-8'))
         try:
-            self.model(id=agent_id, first_name=data['first_name'],
-                       last_name=data['last_name'], email=data['email']) \
+            self.model(id=transaction_id, agent_id=data['agent_id'],
+                       amount=data['amount'], date=data['date']) \
                 .save()
             return HttpResponse()
         except (KeyError, IntegrityError):
             return HttpResponseBadRequest()
 
-    def patch(self, request, agent_id):
+    def patch(self, request, transaction_id):
         data = json.loads(request.body.decode('utf-8'))
         try:
-            agent = self.model.objects.get(id=agent_id)
-            fields = ['first_name', 'last_name', 'email']
+            agent = self.model.objects.get(id=transaction_id)
+            fields = ['agent_id', 'amount', 'date']
             for field in fields:
                 if field in data.keys():
                     setattr(agent, field, data[field])
@@ -69,6 +65,10 @@ class AgentView(View):
         except (KeyError, IntegrityError, self.model.DoesNotExist):
             return HttpResponseBadRequest()
 
-    def delete(self, request, agent_id):
-        get_object_or_404(self.model, id=agent_id).delete()
-        return HttpResponse()
+    def delete(self, request, transaction_id):
+        try:
+            res = self.model.objects.filter(id=transaction_id).delete()
+            print(res)
+            return HttpResponse()
+        except (KeyError, IntegrityError, self.model.DoesNotExist):
+            return HttpResponseBadRequest()
