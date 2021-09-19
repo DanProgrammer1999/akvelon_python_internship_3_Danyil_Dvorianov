@@ -1,10 +1,10 @@
 import json
 
-from django.core import serializers
+from django.core.exceptions import FieldError
 from django.db import IntegrityError
 from django.db.models import Sum
 from django.db.models.functions import TruncDate, TruncMonth
-from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, HttpResponseNotFound
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from django.views import View
@@ -29,16 +29,19 @@ class TransactionView(View):
 
                 if group_by:
                     if not agent_id:
-                        return HttpResponseBadRequest('agent_id is not specified for aggregate request')
+                        return HttpResponseBadRequest(json.dumps(
+                            {'error': 'agent_id is not specified for aggregate request'}
+                        ), content_type='application/json')
                     return self.group_transactions(items, group_by)
                 else:
-                    items = items.order_by(sort_by)
-                    return HttpResponse(serializers.serialize("json", items), content_type="application/json")
-            except (ValueError, AttributeError) as e:
-                return HttpResponseBadRequest(e.__cause__)
+                    return JsonResponse(list(items.order_by(sort_by).values()), safe=False)
+            except FieldError:
+                return HttpResponseBadRequest(json.dumps(
+                    {'error': 'incorrect value for sort_by parameter'}
+                ), content_type='application/json')
         else:
-            item = get_object_or_404(self.model, id=transaction_id)
-            return HttpResponse(serializers.serialize("json", [item]), content_type="application/json")
+            item = list(self.model.objects.filter(id=transaction_id).values())
+            return JsonResponse(item, safe=False) if len(item) > 0 else HttpResponseNotFound()
 
     @staticmethod
     def group_transactions(items, group_by):
@@ -47,7 +50,9 @@ class TransactionView(View):
         elif group_by == 'month':
             items = items.annotate(month=TruncMonth('date'))
         else:
-            return HttpResponseBadRequest(f'Unknown group_by value: {group_by}. Choose either \'day\' or \'month\'')
+            return HttpResponseBadRequest(json.dumps({
+                'error': f'Unknown group_by value: {group_by}. Choose either \'day\' or \'month\''
+            }), content_type='application/json')
 
         items = items.values(group_by).annotate(total=Sum('amount')).values(group_by, 'total').order_by(group_by)
 
@@ -74,19 +79,19 @@ class TransactionView(View):
         data = json.loads(request.body.decode('utf-8'))
         try:
             agent = get_object_or_404(Agent, id=data['agent_id'])
-            item = self.model.objects.create(agent_id=agent, amount=data['amount'], date=data['date'])
+            item = self.model.objects.create(agent=agent, amount=data['amount'], date=data['date'])
             return JsonResponse({'id': item.id}, status=201)
-        except (KeyError, IntegrityError):
-            return HttpResponseBadRequest()
+        except KeyError as e:
+            return HttpResponseBadRequest(json.dumps({'error': e.__cause__}), content_type='application/json')
 
     def put(self, request, transaction_id):
         data = json.loads(request.body.decode('utf-8'))
         try:
-            self.model.objects.create(id=transaction_id, agent_id=data['agent_id'],
+            self.model.objects.create(id=transaction_id, agent=get_object_or_404(Agent, id=data['agent_id']),
                                       amount=data['amount'], date=data['date'])
             return HttpResponse()
-        except (KeyError, IntegrityError):
-            return HttpResponseBadRequest()
+        except (KeyError, IntegrityError) as e:
+            return HttpResponseBadRequest(json.dumps({'error': e.__cause__}), content_type='application/json')
 
     def patch(self, request, transaction_id):
         data = json.loads(request.body.decode('utf-8'))
@@ -98,12 +103,12 @@ class TransactionView(View):
                     setattr(item, field, data[field])
 
             if 'agent_id' in data:
-                item.agent_id = Agent.objects.get(id=data['agent_id'])
+                item.agent = Agent.objects.get(id=data['agent_id'])
 
             item.save()
             return HttpResponse()
-        except (KeyError, IntegrityError, self.model.DoesNotExist):
-            return HttpResponseBadRequest()
+        except (KeyError, IntegrityError, self.model.DoesNotExist) as e:
+            return HttpResponseBadRequest(json.dumps({'error': e.__cause__}), content_type='application/json')
 
     def delete(self, request, transaction_id):
         get_object_or_404(self.model, id=transaction_id).delete()

@@ -1,18 +1,14 @@
 import json
 
-from django.core import serializers
+from django.core.exceptions import FieldError
 from django.db import IntegrityError
-from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, HttpResponseNotFound
 from django.shortcuts import get_object_or_404
-from django.utils.decorators import method_decorator
 from django.views import View
-from django.views.decorators.csrf import csrf_exempt
 
 from transapp.models.agent import Agent
 
 
-# TODO remove decorator
-@method_decorator(csrf_exempt, name='dispatch')
 class AgentView(View):
     model = Agent
 
@@ -22,24 +18,28 @@ class AgentView(View):
         if agent_id == '':
             try:
                 all_agents = self.model.objects.order_by(sort_by_field)
-                if email_filter:
-                    all_agents = all_agents.filter(email__contains=email_filter)
-            except AttributeError:
-                return HttpResponseBadRequest()
+            except FieldError:
+                return HttpResponseBadRequest(json.dumps(
+                    {'error': 'incorrect value for sort_by parameter'}
+                ), content_type='application/json')
 
-            return HttpResponse(serializers.serialize("json", all_agents), content_type="application/json")
+            if email_filter:
+                all_agents = all_agents.filter(email__contains=email_filter)
+            return JsonResponse(list(all_agents.values()), safe=False)
         else:
-            agent = get_object_or_404(self.model, id=agent_id)
-            return HttpResponse(serializers.serialize("json", [agent]), content_type="application/json")
+            agent = list(self.model.objects.filter(id=agent_id).values())
+            return JsonResponse(agent, safe=False) if len(agent) > 0 else HttpResponseNotFound()
 
     def post(self, request):
         data = json.loads(request.body.decode('utf-8'))
         try:
-            agent = self.model.objects.create(first_name=data['first_name'], last_name=data['last_name'],
-                                              email=data['email'])
+            agent = self.model.objects.create(
+                first_name=data['first_name'], last_name=data['last_name'], email=data['email']
+            )
             return JsonResponse({'id': agent.id}, status=201)
-        except (KeyError, IntegrityError):
-            return HttpResponseBadRequest()
+        except (KeyError, IntegrityError) as e:
+            content = json.dumps({'error': e.__cause__}) if e.__cause__ else ''
+            return HttpResponseBadRequest(content, content_type='application/json')
 
     def put(self, request, agent_id):
         data = json.loads(request.body.decode('utf-8'))
@@ -47,13 +47,18 @@ class AgentView(View):
             self.model.objects.create(id=agent_id, first_name=data['first_name'], last_name=data['last_name'],
                                       email=data['email'])
             return HttpResponse()
-        except (KeyError, IntegrityError):
-            return HttpResponseBadRequest()
+        except KeyError as e:
+            content = json.dumps({'error': e.__cause__}) if e.__cause__ else ''
+            return HttpResponseBadRequest(content, content_type='application/json')
+        except IntegrityError:
+            return HttpResponseBadRequest(json.dumps({
+                'error': 'email address specified already exists'
+            }), content_type='application/json')
 
     def patch(self, request, agent_id):
         data = json.loads(request.body.decode('utf-8'))
         try:
-            agent = self.model.objects.get(id=agent_id)
+            agent = get_object_or_404(self.model, id=agent_id)
             fields = ['first_name', 'last_name', 'email']
             for field in fields:
                 if field in data.keys():
@@ -61,8 +66,10 @@ class AgentView(View):
 
             agent.save()
             return HttpResponse()
-        except (KeyError, IntegrityError, self.model.DoesNotExist):
-            return HttpResponseBadRequest()
+        except IntegrityError:
+            return HttpResponseBadRequest(json.dumps({
+                'error': 'email address specified already exists'
+            }), content_type='application/json')
 
     def delete(self, request, agent_id):
         get_object_or_404(self.model, id=agent_id).delete()
