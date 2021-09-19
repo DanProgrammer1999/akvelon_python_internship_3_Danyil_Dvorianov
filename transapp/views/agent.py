@@ -2,8 +2,8 @@ import json
 
 from django.core import serializers
 from django.db import IntegrityError
-from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
-from django.shortcuts import redirect, get_object_or_404
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -21,18 +21,16 @@ class AgentView(View):
         sort_by_field = request.GET.get('sort_by', 'last_name')
         if agent_id == '':
             try:
-                all_agents = sorted(self.model.objects.filter(email__contains=email_filter),
-                                    key=lambda a: getattr(a, sort_by_field))
+                all_agents = self.model.objects.order_by(sort_by_field)
+                if email_filter:
+                    all_agents = all_agents.filter(email__contains=email_filter)
             except AttributeError:
                 return HttpResponseBadRequest()
 
             return HttpResponse(serializers.serialize("json", all_agents), content_type="application/json")
         else:
-            try:
-                agent = get_object_or_404(self.model, id=agent_id)
-                return HttpResponse(serializers.serialize("json", [agent]), content_type="application/json")
-            except self.model.DoesNotExist:
-                return Http404()
+            agent = get_object_or_404(self.model, id=agent_id)
+            return HttpResponse(serializers.serialize("json", [agent]), content_type="application/json")
 
     def post(self, request):
         data = json.loads(request.body.decode('utf-8'))
