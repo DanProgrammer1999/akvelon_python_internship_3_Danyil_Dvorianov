@@ -4,6 +4,5 @@ from .agent import Agent
 
 class Transaction(models.Model):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE)
-    # store integer instead of float to avoid float representation problems
-    amount = models.IntegerField()
+    amount = models.FloatField()
     date = models.DateTimeField()
