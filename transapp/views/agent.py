@@ -35,20 +35,17 @@ class AgentView(View):
     def post(self, request):
         data = json.loads(request.body.decode('utf-8'))
         try:
-            agent = self.model(first_name=data['first_name'], last_name=data['last_name'], email=data['email'])
-            agent.save()
-            response = JsonResponse({'id': agent.id})
-            response.status_code = 201
-            return response
+            agent = self.model.objects.create(first_name=data['first_name'], last_name=data['last_name'],
+                                              email=data['email'])
+            return JsonResponse({'id': agent.id}, status=201)
         except (KeyError, IntegrityError):
             return HttpResponseBadRequest()
 
     def put(self, request, agent_id):
         data = json.loads(request.body.decode('utf-8'))
         try:
-            self.model(id=agent_id, first_name=data['first_name'],
-                       last_name=data['last_name'], email=data['email']) \
-                .save()
+            self.model.objects.create(id=agent_id, first_name=data['first_name'], last_name=data['last_name'],
+                                      email=data['email'])
             return HttpResponse()
         except (KeyError, IntegrityError):
             return HttpResponseBadRequest()
