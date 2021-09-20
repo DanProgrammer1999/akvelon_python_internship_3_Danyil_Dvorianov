@@ -1,0 +1,255 @@
+---
+swagger: "2.0"
+info:
+  description: ""
+  version: "0.1"
+  title: Transapp
+host: virtserver.swaggerhub.com
+basePath: /DanielDv99/Transapp/0.1
+schemes:
+- https
+paths:
+  /agent:
+    get:
+      summary: Get list of all agents
+      description: Get list of all agents.
+      parameters:
+      - name: email
+        in: query
+        description: filter agents by given email prefix
+        required: false
+        type: string
+      - name: sort_by
+        in: query
+        description: specify field by which the results are sorted
+        required: false
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: incorrect value was given to sort_by parameter
+    post:
+      summary: Create a new agent
+      description: Create a new agent from given data.
+      parameters: []
+      responses:
+        "201":
+          description: Created; returns id of new agent
+        "400":
+          description: Wrong or not complete data in the request. Possibly not unique email address.
+  /agent/{id}:
+    get:
+      summary: Find and return the agent with given id
+      description: Find and return the agent with given id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+    put:
+      summary: Replace existing agent with the given data, or create a new one
+      description: Replace existing agent with the given data, or create a new one
+      parameters:
+      - name: id
+        in: path
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad request
+    delete:
+      summary: Find and delete agent with the given id
+      description: Find and delete agent with the given id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+    patch:
+      summary: Find and update agent's fields with the given data
+      description: Find and update agent's fields with the given data
+      parameters:
+      - name: id
+        in: path
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+  /transaction:
+    get:
+      summary: 'Get list of all transactions:'
+      description: Get list of all transactions
+      parameters:
+      - name: type
+        in: query
+        description: Specify either income or outcome to receive results with amount greater or less then zero
+        required: false
+        type: string
+      - name: start_date
+        in: query
+        description: Filter transactions with date after the specified one (inclusive)
+        required: false
+        type: string
+      - name: end_date
+        in: query
+        description: Filter transactions with date before the specified one (inclusive)
+        required: false
+        type: string
+      - name: sort_by
+        in: query
+        description: Order results by the specified field in ascending order
+        required: false
+        type: string
+      - name: agent_id
+        in: query
+        description: Find transactions for agent with specified id
+        required: false
+        type: integer
+      - name: group_by
+        in: query
+        description: Requires agent id to be set. Apply grouping by a time unit, either `day` or `month`. Return date for each group and total amount for each time period. sort_by parameter does not apply here.
+        required: false
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: incorrect value was given to sort_by parameter
+    post:
+      summary: Add new transaction with the given data
+      description: Add new transaction with the given data
+      parameters: []
+      responses:
+        "200":
+          description: OK
+  /agent/{agent_id}/transactions:
+    get:
+      summary: List all transactions of agent with {agent_id}
+      description: List all transactions of agent with {agent_id}
+      parameters:
+      - name: agent_id
+        in: path
+        description: Id of agent used to filter the transactions
+        required: true
+        type: integer
+      - name: type
+        in: query
+        description: Specify either income or outcome to receive results with amount greater or less then zero
+        required: false
+        type: string
+      - name: start_date
+        in: query
+        description: Filter transactions with date after the specified one (inclusive)
+        required: false
+        type: string
+      - name: end_date
+        in: query
+        description: Filter transactions with date before the specified one (inclusive)
+        required: false
+        type: string
+      - name: sort_by
+        in: query
+        description: Order results by the specified field in ascending order
+        required: false
+        type: string
+      - name: group_by
+        in: query
+        description: Apply grouping by a time unit, either `day` or `month`. Return date for each group and total amount for each time period. sort_by parameter does not apply here.
+        required: false
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Incorrect value was given to sort_by parameter
+  /transaction/{id}:
+    get:
+      summary: Return transaction with given id, if any
+      description: Return transaction with given id, if any
+      parameters:
+      - name: id
+        in: path
+        description: Id of transaction
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Transaction with given id is not found
+    put:
+      summary: Replace transaction with given id with the new data, or create a new one
+      description: Replace transaction with given id with the new data, or create a new one
+      parameters:
+      - name: id
+        in: path
+        description: Id of transaction
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: One or more field values were missing from request body
+    delete:
+      summary: Delete the specified transaction, if any
+      description: Delete the specified transaction, if any
+      parameters:
+      - name: id
+        in: path
+        description: Id of transaction
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Transaction with given id is not found
+    patch:
+      summary: Update (a subset) of fields for a given transaction
+      description: Update (a subset) of fields for a given transaction
+      parameters:
+      - name: id
+        in: path
+        description: Id of transaction
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+definitions:
+  Agent:
+    type: object
+    properties:
+      id:
+        type: integer
+        format: int64
+      first_name:
+        type: string
+      last_name:
+        type: string
+      email:
+        type: string
+  Transaction:
+    type: object
+    properties:
+      id:
+        type: integer
+        format: int64
+      amount:
+        type: number
+        format: float
+      date:
+        type: string
+      agent:
+        type: integer

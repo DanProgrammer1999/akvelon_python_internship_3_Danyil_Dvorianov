@@ -37,9 +37,13 @@ class AgentView(View):
                 first_name=data['first_name'], last_name=data['last_name'], email=data['email']
             )
             return JsonResponse({'id': agent.id}, status=201)
-        except (KeyError, IntegrityError) as e:
+        except KeyError as e:
             content = json.dumps({'error': e.__cause__}) if e.__cause__ else ''
             return HttpResponseBadRequest(content, content_type='application/json')
+        except IntegrityError:
+            return HttpResponseBadRequest(json.dumps({
+                'error': 'email address specified already exists'
+            }), content_type='application/json')
 
     def put(self, request, agent_id):
         data = json.loads(request.body.decode('utf-8'))

@@ -90,25 +90,22 @@ class TransactionView(View):
             self.model.objects.create(id=transaction_id, agent=get_object_or_404(Agent, id=data['agent_id']),
                                       amount=data['amount'], date=data['date'])
             return HttpResponse()
-        except (KeyError, IntegrityError) as e:
+        except KeyError as e:
             return HttpResponseBadRequest(json.dumps({'error': e.__cause__}), content_type='application/json')
 
     def patch(self, request, transaction_id):
         data = json.loads(request.body.decode('utf-8'))
-        try:
-            item = get_object_or_404(self.model, id=transaction_id)
-            fields = ['amount', 'date']
-            for field in fields:
-                if field in data.keys():
-                    setattr(item, field, data[field])
+        item = get_object_or_404(self.model, id=transaction_id)
+        fields = ['amount', 'date']
+        for field in fields:
+            if field in data.keys():
+                setattr(item, field, data[field])
 
-            if 'agent_id' in data:
-                item.agent = Agent.objects.get(id=data['agent_id'])
+        if 'agent_id' in data:
+            item.agent = Agent.objects.get(id=data['agent_id'])
 
-            item.save()
-            return HttpResponse()
-        except (KeyError, IntegrityError, self.model.DoesNotExist) as e:
-            return HttpResponseBadRequest(json.dumps({'error': e.__cause__}), content_type='application/json')
+        item.save()
+        return HttpResponse()
 
     def delete(self, request, transaction_id):
         get_object_or_404(self.model, id=transaction_id).delete()

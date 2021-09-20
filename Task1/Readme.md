@@ -49,7 +49,7 @@ Has 2 models: Agent and Transaction.
 Returns date for each group and total amount for each time period. All other parameters apply here,
 except `sort_by`.
 
-`GET /agent/<id>/transaction`: alias for `GET /transaction?agent_id=<id>`.
+`GET /agent/<id>/transactions`: alias for `GET /transaction?agent_id=<id>`.
  
 `POST /transaction`: add new transaction with the given data
  
